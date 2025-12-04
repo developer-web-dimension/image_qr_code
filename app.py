@@ -1,91 +1,126 @@
 import torch
-from diffusers import ControlNetModel, StableDiffusionControlNetImg2ImgPipeline
 from PIL import Image
-from pyzbar.pyzbar import decode
+import qrcode
 import os
 
-QR_PATH = r"inputs\qrcode.png"
-STYLE_PATH = r"inputs\ram.png"
-OUTPUT_PATH = r"outputs\final_qr_image.png"
-
-device = "cuda"
-
-# ----------------------------------------------------
-# Load images (512x512 for SD15)
-# ----------------------------------------------------
-def load_img(path, name):
-    if not os.path.exists(path):
-        raise FileNotFoundError(f"{name} missing: {path}")
-    img = Image.open(path).convert("RGB").resize((512, 512))
-    print(f"Loaded {name}")
-    return img
-
-qr_img = load_img(QR_PATH, "QR")
-style_img = load_img(STYLE_PATH, "Style")
-
-
-# ----------------------------------------------------
-# Load ControlNet (SD15 QR version)
-# ----------------------------------------------------
-print("Loading ControlNet SD15 QR...")
-controlnet = ControlNetModel.from_pretrained(
-    "monster-labs/control_v1p_sd15_qrcode_monster",
-    torch_dtype=torch.float16
+from diffusers import (
+    StableDiffusionControlNetImg2ImgPipeline,
+    ControlNetModel,
+    DDIMScheduler,
+    DPMSolverMultistepScheduler,
+    DEISMultistepScheduler,
+    HeunDiscreteScheduler,
+    EulerDiscreteScheduler,
 )
 
-# ----------------------------------------------------
-# Load SD 1.5 Img2Img Pipeline
-# ----------------------------------------------------
-print("Loading SD15 Img2Img...")
+controlnet = ControlNetModel.from_pretrained(
+    "DionTimmer/controlnet_qrcode-control_v1p_sd15",
+    torch_dtype=torch.float16
+).to("cuda")
+
 pipe = StableDiffusionControlNetImg2ImgPipeline.from_pretrained(
     "runwayml/stable-diffusion-v1-5",
     controlnet=controlnet,
+    safety_checker=None,
     torch_dtype=torch.float16,
-    safety_checker=None
-)
+).to("cuda")
 
-pipe.enable_model_cpu_offload()    
+pipe = pipe.to(torch.float32)
 pipe.enable_xformers_memory_efficient_attention()
 
-prompt = (
-    "Blend the QR code into the image while keeping it readable, clean, artistic."
-)
+def resize_for_condition_image(input_image: Image.Image, resolution: int):
+    """Resize input image while keeping it divisible by 64."""
+    input_image = input_image.convert("RGB")
+    W, H = input_image.size
+    k = float(resolution) / min(H, W)
+    H *= k
+    W *= k
+    H = int(round(H / 64.0)) * 64
+    W = int(round(W / 64.0)) * 64
+    return input_image.resize((W, H), Image.LANCZOS)
 
-# ----------------------------------------------------
-# QR validator
-# ----------------------------------------------------
-def is_qr_scannable(path):
-    try:
-        return len(decode(Image.open(path))) > 0
-    except:
-        return False
 
-# ----------------------------------------------------
-# Generate + Retry Logic
-# ----------------------------------------------------
-print("\nGenerating QR-image...")
+SAMPLER_MAP = {
+    "DPM++ Karras SDE": lambda cfg: DPMSolverMultistepScheduler.from_config(cfg, use_karras=True, algorithm_type="sde-dpmsolver++"),
+    "DPM++ Karras": lambda cfg: DPMSolverMultistepScheduler.from_config(cfg, use_karras=True),
+    "Heun": lambda cfg: HeunDiscreteScheduler.from_config(cfg),
+    "Euler": lambda cfg: EulerDiscreteScheduler.from_config(cfg),
+    "DDIM": lambda cfg: DDIMScheduler.from_config(cfg),
+    "DEIS": lambda cfg: DEISMultistepScheduler.from_config(cfg),
+}
 
-strength_list = [0.55, 0.45, 0.35]
 
-for strength in strength_list:
-    print(f"Trying strength={strength}")
+def generate_qr_image(
+    qr_code_content: str,
+    prompt: str,
+    negative_prompt: str = "ugly, low quality, blurry, distorted, nsfw",
+    guidance_scale: float = 7.5,
+    controlnet_conditioning_scale: float = 1.1,
+    strength: float = 0.9,
+    seed: int = 12345,
+    sampler: str = "DPM++ Karras SDE",
+    width: int = 768,
+    height: int = 768,
+    qrcode_image: Image.Image | None = None,
+):
 
+    # Set sampler
+    pipe.scheduler = SAMPLER_MAP[sampler](pipe.scheduler.config)
+
+    # Seed control
+    generator = torch.Generator(device="cuda").manual_seed(seed)
+
+    # Generate or use QR image
+    if qrcode_image is None:
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_H,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(qr_code_content)
+        qr.make(fit=True)
+        qrcode_image = qr.make_image(fill_color="black", back_color="white")
+
+    # Resize QR
+    qrcode_image = resize_for_condition_image(qrcode_image, 768)
+
+    # Use QR as init + control image
+    init_image = qrcode_image
+    control_image = qrcode_image
+
+    # Run Stable Diffusion
     result = pipe(
         prompt=prompt,
-        image=style_img,
-        controlnet_conditioning_image=qr_img,
+        negative_prompt=negative_prompt,
+        image=init_image,
+        control_image=control_image,
+        width=width,
+        height=height,
         strength=strength,
-        num_inference_steps=20,   # 🔥 Keep low for 4GB
-        guidance_scale=7.0,
-    ).images[0]
+        guidance_scale=guidance_scale,
+        controlnet_conditioning_scale=controlnet_conditioning_scale,
+        num_inference_steps=40,
+        generator=generator,
+    )
 
-    result.save(OUTPUT_PATH)
+    return result.images[0]
 
-    if is_qr_scannable(OUTPUT_PATH):
-        print("SUCCESS: Scannable QR ✔")
-        break
 
-else:
-    print("WARNING: QR not scannable after attempts.")
+if __name__ == "__main__":
 
-print("Saved output:", OUTPUT_PATH)
+    output_path = "output_qr.png"
+
+    img = generate_qr_image(
+        qr_code_content="https://web-dimension.com/home/",
+        prompt="Minecraft voxel world with sky and clouds, single QR code built from Minecraft blocks, clean pixel art style, highly readable design",
+        negative_prompt="ugly, blurry, low quality, distorted, extra QR codes, duplicate QR patterns, barcodes, random squares, nsfw",
+        guidance_scale=7.5,
+        controlnet_conditioning_scale=1.1,
+        strength=0.9,
+        seed=1234567,
+        sampler="DPM++ Karras SDE",
+    )
+
+    img.save(output_path)
+    print(f"Saved: {output_path}")
