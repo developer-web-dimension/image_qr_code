@@ -100,7 +100,7 @@ def generate_qr_image(
         strength=strength,
         guidance_scale=guidance_scale,
         controlnet_conditioning_scale=controlnet_conditioning_scale,
-        num_inference_steps=40,
+        num_inference_steps=35,
         generator=generator,
     )
 
@@ -109,7 +109,7 @@ def generate_qr_image(
 
 if __name__ == "__main__":
 
-    output_path = "output_qr.png"
+    output_path = r"output/output_n30.png"
 
     img = generate_qr_image(
         qr_code_content="https://web-dimension.com/home/",
