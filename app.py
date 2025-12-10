@@ -100,8 +100,8 @@ def generate_qr_image(
         strength=strength,
         guidance_scale=guidance_scale,
         controlnet_conditioning_scale=controlnet_conditioning_scale,
-        num_inference_steps=35,
-        generator=generator,
+        num_inference_steps=40,
+        generator=generator
     )
 
     return result.images[0]
@@ -109,18 +109,18 @@ def generate_qr_image(
 
 if __name__ == "__main__":
 
-    output_path = r"output/output_n30.png"
+    output_path = r"output/output_Naruto_uzumaki_test10_min.png"
 
     img = generate_qr_image(
-        qr_code_content="https://web-dimension.com/home/",
-        prompt="Minecraft voxel world with sky and clouds, single QR code built from Minecraft blocks, clean pixel art style, highly readable design",
-        negative_prompt="ugly, blurry, low quality, distorted, extra QR codes, duplicate QR patterns, barcodes, random squares, nsfw",
-        guidance_scale=7.5,
-        controlnet_conditioning_scale=1.1,
-        strength=0.9,
+        qr_code_content="https://britanniatreatnaruto.com",
+        prompt="High-energy Naruto-style QR code art, QR code forming the entire backdrop with stylized chakra-infused finder patterns glowing brightly. A dramatic ninja chakra figure in front, arm extended as if unleashing a Rasengan-like burst of energy, intense orange and blue rim lighting, neon reflections on the figure, cinematic anime shading, explosive glow effects, clean QR modules preserved for readability.",
+        negative_prompt="blurry, low contrast, messy QR, broken QR modules, extra QR codes, duplicate patterns, text, watermark, poorly drawn anatomy, washed-out colors, weak lighting, low detail",
+        guidance_scale=8,
+        controlnet_conditioning_scale=1.2,
+        strength=0.85,
         seed=1234567,
         sampler="DPM++ Karras SDE",
     )
 
-    img.save(output_path)
+    img.save(output_path)                                                           
     print(f"Saved: {output_path}")

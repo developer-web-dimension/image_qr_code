@@ -1,0 +1,11 @@
+1. Minecraft voxel world with sky and clouds, single QR code built from Minecraft blocks, clean pixel art style, highly readable design
+2. Naruto Uzumaki standing behind a single glowing QR code, warm golden sunlight, soft swirling chakra energy around him, subtle Hidden Leaf Village background elements, clean anime line art, vivid yet balanced colors, dynamic heroic pose, minimal clutter, QR code clearly visible and unobstructed.
+3. QR code presented as a sealed ninja scroll, subtle ink swirl motifs, parchment texture with clean anime lines, warm lighting, Hidden Leaf symbols faintly patterned in the background, highly legible QR.
+4. Naruto-inspired scene featuring a single glowing QR code, clean square QR modules preserved with finder patterns sharp and unobstructed, subtle Hidden Leaf Village swirl motifs behind or around the QR code, warm anime-style sunlight and soft gradients, elegant minimalist composition ensuring maximum QR readability. A small stylized Naruto kunai emblem placed in safe central logo space of the QR code, without covering or distorting essential QR modules.
+5. 
+
+
+
+Alternative 
+QR code model monster QR SDXL
+SDXL Stable defusion model
